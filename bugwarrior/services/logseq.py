@@ -248,6 +248,7 @@ class LogseqIssue(Issue):
         annotations = []
         scheduled_date = None
         deadline_date = None
+        project = None
         in_logbook = False
         for line in self.record["content"].split("\n"):
             # Ignore things which are only useful within Logseq
@@ -269,10 +270,12 @@ class LogseqIssue(Issue):
                 scheduled_date = self.get_scheduled_date(line)
             elif line.startswith("DEADLINE: "):
                 deadline_date = self.get_scheduled_date(line)
+            elif line.startswith("project:: "):
+                project = line.replace("project:: ", "", 1).strip()
             else:
                 annotations.append(self._unescape_content(line))
         annotations.pop(0)  # remove first line
-        return annotations, scheduled_date, deadline_date
+        return annotations, scheduled_date, deadline_date, project
 
     def get_url(self):
         return f'logseq://graph/{self.extra["graph"]}?block-id={self.record["uuid"]}'
@@ -318,12 +321,14 @@ class LogseqIssue(Issue):
         return self.get_logseq_state() in ["WAIT", "WAITING"]
 
     def to_taskwarrior(self):
-        annotations, scheduled_date, deadline_date = self.get_annotations_from_content()
+        annotations, scheduled_date, deadline_date, project = (
+            self.get_annotations_from_content()
+        )
         wait_date = min(
             [d for d in [scheduled_date, deadline_date, self.SOMEDAY] if d is not None]
         )
         return {
-            "project": self.extra["graph"],
+            "project": project or self.extra["graph"],
             "priority": self.get_priority(),
             "annotations": annotations,
             "tags": self.get_tags_from_labels(self.get_tags_from_content()),
